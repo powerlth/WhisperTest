@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>음성 인식 데모</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+        button, input[type="file"] { font-size: 18px; padding: 10px 20px; margin: 10px; }
+        #result { margin-top: 30px; font-size: 20px; color: #333; }
+    </style>
+</head>
+<body>
+
+    <h1>🎙 음성 녹음 & 파일 업로드 → 텍스트 변환</h1>
+
+    <!-- 녹음 -->
+    <button id="recordBtn">녹음 시작</button>
+
+    <!-- 파일 업로드 -->
+    <div>
+        <input type="file" id="fileInput" accept="audio/*">
+        <button id="uploadBtn">파일 업로드</button>
+    </div>
+
+    <div id="result">결과: <span id="textOutput">-</span></div>
+
+    <script>
+        const recordBtn = document.getElementById('recordBtn');
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const textOutput = document.getElementById('textOutput');
+
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+
+        // 공통 함수: STT 요청
+        async function sendAudioToServer(audioBlob) {
+            const formData = new FormData();
+            formData.append('file', audioBlob, 'audio.webm');
+
+            textOutput.textContent = "인식 중...";
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/stt', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                textOutput.textContent = result.text || "인식 실패";
+            } catch (error) {
+                console.error(error);
+                textOutput.textContent = "서버 오류 발생";
+            }
+        }
+
+        // 녹음 버튼 동작
+        recordBtn.addEventListener('click', async () => {
+            if (!isRecording) {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    sendAudioToServer(audioBlob);
+                };
+
+                mediaRecorder.start();
+                recordBtn.textContent = "녹음 중지";
+                isRecording = true;
+            } else {
+                mediaRecorder.stop();
+                recordBtn.textContent = "녹음 시작";
+                isRecording = false;
+            }
+        });
+
+        // 업로드 버튼 동작
+        uploadBtn.addEventListener('click', () => {
+            const file = fileInput.files[0];
+            if (!file) {
+                alert("먼저 오디오 파일을 선택하세요.");
+                return;
+            }
+            sendAudioToServer(file);
+        });
+    </script>
+
+</body>
+</html>
