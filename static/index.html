@@ -4,22 +4,37 @@
     <meta charset="UTF-8">
     <title>음성 인식 데모</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; max-width: 800px; margin: 30px auto; }
         button, input[type="file"] { font-size: 18px; padding: 10px 20px; margin: 10px; }
         #result { margin-top: 30px; font-size: 20px; color: #333; }
         .status { font-size: 14px; color: #666; margin-top: 10px; }
         .error { color: red; }
         .recording { color: red; animation: blink 1s infinite; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #eee; border-radius: 5px; }
+        .section-title { font-weight: bold; margin-bottom: 10px; }
+        #audioPreview { margin-top: 15px; display: none; width: 100%; }
+        #deviceInfo { margin-top: 15px; font-size: 14px; text-align: left; }
+        select { padding: 8px; font-size: 16px; margin: 5px; min-width: 250px; }
         @keyframes blink { 50% { opacity: 0.5; } }
-        #audioPreview { margin-top: 15px; display: none; }
     </style>
 </head>
 <body>
 
     <h1>🎙 음성 녹음 & 파일 업로드 → 텍스트 변환</h1>
 
+    <!-- 마이크 장치 선택 -->
+    <div class="section">
+        <div class="section-title">🎤 마이크 장치 선택</div>
+        <select id="audioDevices">
+            <option value="">마이크 장치를 불러오는 중...</option>
+        </select>
+        <button id="refreshDevices">장치 목록 새로고침</button>
+        <div id="deviceInfo"></div>
+    </div>
+
     <!-- 녹음 -->
-    <div>
+    <div class="section">
+        <div class="section-title">🔴 녹음 컨트롤</div>
         <button id="recordBtn">녹음 시작</button>
         <span id="recordingStatus" class="status"></span>
         <div>
@@ -28,12 +43,16 @@
     </div>
 
     <!-- 파일 업로드 -->
-    <div>
+    <div class="section">
+        <div class="section-title">📁 파일 업로드</div>
         <input type="file" id="fileInput" accept="audio/*">
         <button id="uploadBtn">파일 업로드</button>
     </div>
 
-    <div id="result">결과: <span id="textOutput">-</span></div>
+    <div id="result" class="section">
+        <div class="section-title">📝 변환 결과</div>
+        <div id="textOutput">-</div>
+    </div>
     <div id="errorOutput" class="error"></div>
 
     <script>
@@ -44,11 +63,73 @@
         const errorOutput = document.getElementById('errorOutput');
         const recordingStatus = document.getElementById('recordingStatus');
         const audioPreview = document.getElementById('audioPreview');
+        const audioDevices = document.getElementById('audioDevices');
+        const refreshDevices = document.getElementById('refreshDevices');
+        const deviceInfo = document.getElementById('deviceInfo');
 
         let mediaRecorder;
         let audioChunks = [];
         let isRecording = false;
         let audioStream;
+        let currentDeviceId = '';
+
+        // 마이크 장치 목록 가져오기
+        async function getAudioDevices() {
+            try {
+                showStatus(deviceInfo, "마이크 장치 목록을 불러오는 중...");
+
+                // 임시 오디오 스트림 요청 (장치 접근 권한을 위해)
+                const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                // 모든 장치 정보 가져오기
+                const devices = await navigator.mediaDevices.enumerateDevices();
+
+                // 임시 스트림 중지
+                tempStream.getTracks().forEach(track => track.stop());
+
+                // 기존 옵션 제거
+                audioDevices.innerHTML = '';
+
+                // 오디오 입력 장치만 필터링
+                const audioInputs = devices.filter(device => device.kind === 'audioinput');
+
+                if (audioInputs.length === 0) {
+                    audioDevices.innerHTML = '<option value="">사용 가능한 마이크 장치가 없습니다</option>';
+                    showStatus(deviceInfo, "사용 가능한 마이크 장치를 찾을 수 없습니다", true);
+                    return;
+                }
+
+                // 장치 목록 추가
+                audioInputs.forEach(device => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.text = device.label || `마이크 ${audioDevices.options.length + 1}`;
+                    audioDevices.appendChild(option);
+                });
+
+                // 첫 번째 장치 선택
+                if (audioInputs.length > 0) {
+                    currentDeviceId = audioInputs[0].deviceId;
+                    showStatus(deviceInfo, `현재 선택된 마이크: ${audioInputs[0].label || '기본 마이크'}`);
+                }
+
+                showStatus(deviceInfo, `${audioInputs.length}개의 마이크 장치를 찾았습니다`);
+            } catch (error) {
+                console.error("마이크 장치 목록 가져오기 오류:", error);
+                showStatus(deviceInfo, `마이크 장치 목록을 가져올 수 없습니다: ${error.message}`, true);
+                audioDevices.innerHTML = '<option value="">마이크 접근 권한이 필요합니다</option>';
+            }
+        }
+
+        // 장치 변경 이벤트 리스너
+        audioDevices.addEventListener('change', function() {
+            currentDeviceId = this.value;
+            const selectedOption = this.options[this.selectedIndex];
+            showStatus(deviceInfo, `선택된 마이크: ${selectedOption.text}`);
+        });
+
+        // 장치 목록 새로고침 버튼
+        refreshDevices.addEventListener('click', getAudioDevices);
 
         // 상태 및 오류 표시 함수
         function showStatus(element, message, isError = false) {
@@ -96,8 +177,18 @@
         recordBtn.addEventListener('click', async () => {
             if (!isRecording) {
                 try {
-                    // 오디오 스트림 요청
-                    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    // 선택된 마이크로 오디오 스트림 요청
+                    const constraints = {
+                        audio: currentDeviceId ? { deviceId: { exact: currentDeviceId } } : true
+                    };
+
+                    audioStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+                    // 사용중인 장치 정보 표시
+                    const track = audioStream.getAudioTracks()[0];
+                    if (track) {
+                        showStatus(deviceInfo, `사용 중인 마이크: ${track.label}`);
+                    }
 
                     // 미디어 레코더 설정
                     const options = { mimeType: 'audio/webm' };
@@ -175,6 +266,9 @@
             audioPreview.style.display = "none";
             sendAudioToServer(file);
         });
+
+        // 페이지 로드 시 마이크 장치 목록 가져오기
+        window.addEventListener('DOMContentLoaded', getAudioDevices);
     </script>
 
 </body>
