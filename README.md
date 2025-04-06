@@ -14,9 +14,9 @@ pip install openai-whisper
 
 guy.mp3 기준 
 
-large 모델 처리 시간 : 1.2s
+large 모델 처리 시간 : 9.3s
 
-turbo 모델 처리 시간 : 9.3s
+turbo 모델 처리 시간 : 1.2s
 
 rtx 4070 8GB 기준
 
