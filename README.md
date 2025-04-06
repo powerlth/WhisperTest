@@ -10,7 +10,7 @@ whisper 라이브러리 설치
 pip install openai-whisper
 ```
 
-##모델 선택 - large / turbo
+모델 선택 - large / turbo
 
 guy.mp3 기준 
 
