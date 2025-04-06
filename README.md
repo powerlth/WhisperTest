@@ -18,3 +18,4 @@ large 모델 처리 시간 : 1.2s
 
 turbo 모델 처리 시간 : 9.3s
 
+![예시이미지](https://github.com/powerlth/WhisperTest/blob/master/%EC%8A%A4%ED%81%AC%EB%A6%B0%EC%83%B7%202025-04-06%20183123.png)
