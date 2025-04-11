@@ -39,7 +39,11 @@ async def transcript(file: UploadFile = File(...)):
     print(f"📥 파일 수신: {file.filename}, 타입: {file.content_type}")
 
     # 오디오 타입 확인 로직 개선
-    if not (file.content_type.startswith("audio") or file.content_type == "application/octet-stream"):
+    if not (
+            file.content_type.startswith("audio") or
+            file.content_type == "application/octet-stream" or
+            file.content_type == "video/mp4"
+    ):
         return JSONResponse(
             content={"error": f"올바르지 않은 파일 형식입니다: {file.content_type}"},
             status_code=400

@@ -45,7 +45,7 @@
     <!-- 파일 업로드 -->
     <div class="section">
         <div class="section-title">📁 파일 업로드</div>
-        <input type="file" id="fileInput" accept="audio/*">
+        <input type="file" id="fileInput" accept="audio/*, video/mp4">
         <button id="uploadBtn">파일 업로드</button>
     </div>
 
@@ -151,6 +151,7 @@
             formData.append('file', audioBlob, 'recording.webm');
             showStatus(textOutput, "인식 중...");
             errorOutput.textContent = "";
+            const startTime = Date.now(); // 시작 시간 기록
 
             try {
                 const response = await fetch('/stt', {
@@ -159,9 +160,33 @@
                 });
 
                 const result = await response.json();
+                const endTime = Date.now(); // 응답 후 시간 기록
 
                 if (response.ok) {
-                    showStatus(textOutput, result.text || "인식된 텍스트 없음");
+                    const recognizedText = result.text || "인식된 텍스트 없음";  // ✅ 먼저 정의
+                    const duration = ((endTime - startTime) / 1000).toFixed(2);
+                    textOutput.innerHTML = `
+                    ${recognizedText}
+                    <br><br><span style="color: gray;">🕒 처리 시간: ${duration}초</span>
+                    `;
+
+                        // 📄 텍스트 파일 다운로드 링크 생성
+                    const blob = new Blob([recognizedText], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+
+                    const downloadLink = document.createElement("a");
+                    downloadLink.href = url;
+                    downloadLink.download = "transcription.txt";
+                    downloadLink.textContent = "📄 텍스트 파일 다운로드";
+                    downloadLink.style.display = "inline-block";
+                    downloadLink.style.marginTop = "10px";
+
+                    // 기존 링크가 있다면 제거 후 새로 추가
+                    const oldLink = document.getElementById("downloadLink");
+                    if (oldLink) oldLink.remove();
+                    downloadLink.id = "downloadLink";
+                    textOutput.appendChild(document.createElement("br"));
+                    textOutput.appendChild(downloadLink);
                 } else {
                     showStatus(textOutput, "인식 실패");
                     showStatus(errorOutput, `오류: ${result.error || "알 수 없는 오류"}`, true);
